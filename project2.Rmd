@@ -1,0 +1,126 @@
+---
+title: "Project2"
+output: html_document
+---
+
+# Title: Data Analysis of the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database
+
+## 1. Synopsis
+
+
+This report aims to analyse the NOAA storm database and understand the effects of severe weather events and their impact over the population and the economy
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+The data analysis answers the following questions:
+
+**1. The types of events are most harmful with respect to population health.**
+
+**2. The types of events have the greatest economic consequences.**
+
+For further information:
+
+[National Weather Service Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+
+[National Climatic Data Center Storm Events FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+
+
+## 2 Data Processing
+
+- Download the data and add it into a dataframe. 
+- Load the packages
+
+
+```{r}
+
+library("plyr")
+library("ggplot2")
+library("dplyr")
+
+#path <- getwd()
+#Url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+#download.file(Url, destfile = paste(path, "StormData.csv.bz2", sep = "/"))
+
+stormDF <- read.csv("StormData.csv.bz2")
+
+```
+
+- Getting the name of the variables and analysing the structure of the dataframe
+
+```{r}
+
+names(stormDF)
+glimpse(stormDF)
+
+```
+
+- Selecting the columns of interest: The types of events, injuries, fatalities and damages.
+
+```{r}
+
+storm_data <- stormDF[c("STATE", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+glimpse(storm_data)
+```
+
+
+- From the documentation, it was possible to obtain the magnitude of the values for the PROPDMGEXP and PROPDMGEXP variables. The nomemclature follows the pattern: "H" for hundreds, "K" for thousands, "M"" for millions and "B" for billions.
+
+
+```{r}
+
+storm_data$PROPMULT <- 1
+storm_data$PROPMULT[storm_data$PROPDMGEXP =="H"] <- 100
+storm_data$PROPMULT[storm_data$PROPDMGEXP =="K"] <- 1000
+storm_data$PROPMULT[storm_data$PROPDMGEXP =="M"] <- 1000000
+storm_data$PROPMULT[storm_data$PROPDMGEXP =="B"] <- 1000000000
+```
+
+
+```{r}
+storm_data$CROPMULT <- 1
+storm_data$CROPMULT[storm_data$CROPDMGEXP =="H"] <- 100
+storm_data$CROPMULT[storm_data$CROPDMGEXP =="K"] <- 1000
+storm_data$CROPMULT[storm_data$CROPDMGEXP =="M"] <- 1000000
+storm_data$CROPMULT[storm_data$CROPDMGEXP =="B"] <- 1000000000
+```
+
+- Aggregating the data
+
+```{r}
+
+aggregate_data <- ddply(.data = storm_data, .variables = .(EVTYPE), fatalities = sum(FATALITIES), injuries = sum(INJURIES), property_damage = sum(PROPDMG * PROPMULT), crop_damage = sum(CROPDMG * CROPMULT), summarize)
+
+population_data <- arrange(aggregate_data, desc(fatalities + injuries))
+damage_data <- arrange(aggregate_data, desc(property_damage + crop_damage))
+
+
+```
+
+# Question 1
+
+**1. The types of events are most harmful with respect to population health.**
+
+- Tornado is the most harmful event with respect to population health.
+
+```{r}
+positions <- c("TORNADO", "EXCESSIVE HEAT", "TSTM WIND")
+
+ggplot(data = head(population_data, 3), aes(x = factor(EVTYPE), y = (fatalities + injuries), fill = EVTYPE)) + geom_bar(stat="identity") + coord_flip() + scale_x_discrete(limits = positions)+ scale_fill_brewer(palette="Dark2") + labs(y = "Injuries and fatalities", x = "Event type", title = "Injuries and fatalites per event type across US")
+
+```
+
+# Question 2
+
+**2. The types of events have the greatest economic consequences.**
+
+- Flood has the greatest economic consequences.
+
+```{r}
+
+ggplot(data = head(damage_data, 3), aes(x = factor(EVTYPE), y = (property_damage + crop_damage)/10^9, fill = EVTYPE)) +
+scale_fill_brewer(palette="Dark2")+ geom_bar(stat="identity") + coord_flip() + labs(y = "Property and crop damage", x = "Event type", title = "Property and crop damage by event type accross the US")
+
+
+```
+
